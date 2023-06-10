@@ -1,3 +1,5 @@
+#检查license是否过期
+
 import os
 import re
 import glob
@@ -6,7 +8,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 
 # 替换为实际的license文件所在目录路径（使用Windows路径）
-license_dir = r"C:\Users\clancywang\Desktop\flies\license\nowInstall"
+license_dir = r"$yourPath"
 
 # 获取目录下所有txt文件
 license_files = glob.glob(os.path.join(license_dir, "*.txt"))
