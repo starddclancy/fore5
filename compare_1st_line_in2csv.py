@@ -87,12 +87,31 @@ for value in df1[col_name1]:
 for value in df2[col_name2]:
     matches_in_file1.append(value in df1[col_name1].values)
 
-# 添加结果到数据框中
-df1['Match_in_file2'] = matches_in_file2
-df2['Match_in_file1'] = matches_in_file1
+# 添加结果到数据框
 
-# 写入结果到新的CSV文件
-df1.to_csv('comparison_results_file1.csv', index=False)
-df2.to_csv('comparison_results_file2.csv', index=False)
 
-print("比较结果已保存到 'comparison_results_file1.csv' 和 'comparison_results_file2.csv'")
+
+
+# 定义函数读取CSV文件的第一列
+def read_first_column(file_path):
+    with open(file_path, 'r') as file:
+        return {line.split(',')[0].strip() for line in file}
+
+# 读取两个文件的第一列
+values1 = read_first_column('path_to_first_csv.csv')
+values2 = read_first_column('path_to_second_csv.csv')
+
+# 找出独特的值
+unique_to_file1 = values1 - values2
+unique_to_file2 = values2 - values1
+
+# 写入结果到文本文件
+with open('unique_to_file1.txt', 'w') as file:
+    for value in unique_to_file1:
+        file.write(value + '\n')
+
+with open('unique_to_file2.txt', 'w') as file:
+    for value in unique_to_file2:
+        file.write(value + '\n')
+
+print("独特值已保存到 'unique_to_file1.txt' 和 'unique_to_file2.txt'")
