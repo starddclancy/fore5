@@ -1,0 +1,25 @@
+import csv
+import os
+import shutil
+
+# Adjust these paths to your specific needs
+table_path = 'path/to/your/table.csv'
+directory_path = 'path/to/your/directory'
+destination_directory = 'path/to/destination/directory'
+
+# Read the table and store the first column values in a set for efficient lookups
+macro_names = set()
+with open(table_path, mode='r', encoding='utf-8') as csvfile:
+    reader = csv.reader(csvfile)
+    next(reader)  # Skip the header row
+    for row in reader:
+        macro_names.add(row[0])  # Assuming the macro name is in the first column
+
+# Traverse the directory and process files
+for root, dirs, files in os.walk(directory_path):
+    for file in files:
+        if file in macro_names:
+            source_file_path = os.path.join(root, file)
+            destination_file_path = os.path.join(destination_directory, file)
+            shutil.copyfile(source_file_path, destination_file_path)
+            print(f'Copied: {file}')
