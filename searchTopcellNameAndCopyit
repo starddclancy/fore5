@@ -1,37 +1,18 @@
-import csv
-import os
-import shutil
-import pya
-
-# Path to your CSV file containing macro names
-csv_file_path = '/path/to/your/macro_names.csv'
-# Paths to your source and destination directories
-source_directory = '/path/to/source/directory'
-destination_directory = '/path/to/destination/directory'
-
-# Read macro names from the CSV file
-macro_names = set()
-with open(csv_file_path, newline='', encoding='utf-8') as csvfile:
-    reader = csv.reader(csvfile)
-    for row in reader:
-        macro_names.add(row[0])  # Assuming macro names are in the first column
-
 def copy_matching_files(source_dir, destination_dir, macros):
-    # Iterate over all files in the source directory
-    for filename in os.listdir(source_dir):
-        if filename.endswith('.oas'):  # Assuming we're only processing OASIS files
-            file_path = os.path.join(source_dir, filename)
-            layout = pya.Layout()
-            layout.read(file_path)
+    # Iterate over all files in the source directory and its subdirectories
+    for root, dirs, files in os.walk(source_dir):
+        for filename in files:
+            # Check if the file ends with the specified extensions
+            if filename.endswith('.oas') or filename.endswith('.oasis') or filename.endswith('.remapped'):
+                file_path = os.path.join(root, filename)
+                layout = pya.Layout()
+                layout.read(file_path)
 
-            # Check if the top cell name matches any of the macro names
-            for cell_index in layout.top_cells():
-                cell = layout.cell(cell_index)
-                if cell.name in macros:
-                    # If a match is found, copy the file to the destination directory
-                    shutil.copy(file_path, destination_dir)
-                    print(f"Copied {filename} to {destination_dir}")
-                    break  # Exit the loop after finding a match
-
-# Execute the function
-copy_matching_files(source_directory, destination_directory, macro_names
+                # Check if the top cell name matches any of the macro names
+                for cell_index in layout.top_cells():
+                    cell = layout.cell(cell_index)
+                    if cell.name in macros:
+                        # If a match is found, copy the file to the destination directory
+                        shutil.copy(file_path, destination_dir)
+                        print(f"Copied {filename} to {destination_dir}")
+                        break  # Exit the loop after finding a match
