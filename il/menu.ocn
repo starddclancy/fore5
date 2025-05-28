@@ -1,0 +1,44 @@
+
+
+procedure( ddCreateLayoutPulldownMenu()
+  if( boundp( 'ddLayoutPulldownMenu )
+     then ddLayoutPulldownMenu
+  else
+    hiCreatePulldownMenu(
+       'ddLayoutPulldownMenu
+       "MenuName"  ; The munu name, U can named by your company name.
+       list(
+          hiCreateMenuItem( ; list of menu items
+             ?name 'Item1
+             ?itemText "Item1"
+             ?callback   "println("Item One")"   ; Use you own function to define callback 
+            )
+          hiCreateMenuItem( ; list of menu items
+             ?name 'Item2
+             ?itemText "Item2"
+             ?callback   "println("Item two")"
+            )
+       ) ; list
+    ) ; hiCreatePulldownMenu
+  ) ; if
+) ; procedure
+
+procedure( ddUserPostInstallTrigger(args)
+   hiInsertBannerMenu(
+        args->window
+        ddCreateLayoutPulldownMenu()
+        length( hiGetBannerMenus( args->window))
+   )
+) ; procedure
+
+;; Triggers for adding it to layout and VXL window
+deRegUserTriggers("maskLayout" nil nil 'ddUserPostInstallTrigger)
+deRegUserTriggers("maskLayoutXL" nil nil 'ddUserPostInstallTrigger)
+
+;; Triggers for adding it to schematic window
+deRegUserTriggers("schematic" nil nil 'ddUserPostInstallTrigger)
+
+;; Trigger for adding it to schematic window in case of VXL mode
+deRegUserTriggers( "schSynthesisXL" nil nil 'ddUserPostInstallTrigger)
+
+

@@ -1,0 +1,7 @@
+.SUBCKT cad_dr_a_rdl_half_tmdlvdrv
+M_X113224
++ par
+XI_3856598E594 X_2 X_3 X_6 X_8 X_3 cad_dr_a_ary_t222m
+XI_3856598E597 X_2 X_3 X_6 X_8 X_3 soisub! X77 cad_dr_a_ary_tm
+XI_3856598E598 X_2 X_3 X_6 X_8 X_3 X_8 soisub! cad_dr_a_ary_tm_vwl
+.ENDS

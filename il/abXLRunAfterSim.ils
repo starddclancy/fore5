@@ -1,0 +1,306 @@
+/* abXLRunAfterSim.ils
+
+Language   SKILL
+Date       Jul 19, 2012 
+Modified   Jan 10, 2024 
+
+To install this tool, call 
+
+abXLRunAfterSimInit()
+
+This provides the ability to run an OCEAN script after all the
+simulations have finished, or when View Results is used from the
+history. It also adds a pulldown menu in the window to run the
+scripts manually. This adds menus into ADE XL, Explorer and Assembler;
+if using a version prior to IC617, you can use:
+
+abXLRunAfterSimInit(?viewTypes '("adexl"))
+
+The idea is that you can have a file with the suffix ".ocn" in the
+documents folder of the ADE XL view, and then this is invoked at the
+end. Primarily this is intended for doing custom graphing that you
+want - whilst "Refresh" provides some mechanism to do this, it is
+not as flexible as capturing the plotting requirements in a script.
+
+Note however that any graphs produced by the script will not appear 
+in any datasheet produced.
+
+All the functions which have abXLRunAfterSim prefix are global,
+and all the rest are local.
+
+Broadly based on abXLPlotGraphs.il - but converted to SKILL++ - so
+this file must keep the ".ils" suffix. That was done to allow some
+of the functions to be kept internal, but mostly to allow
+storage of the current results directory without requiring a global
+variable.
+
+There are four functions you can use inside the OCEAN script you
+attach, abXLRunAfterSimOpenResults(), abXLRunAfterSimGetResultsDir(),
+axlXLRunAfterSimGetHistory() and axlXLRunAfterSimIsTestEnabled()
+
+So for example, a script such as this can be used:
+
+    when(abXLRunAfterSimIsTestEnabled("AC")
+        abXLRunAfterSimOpenResults("AC")
+        out=v("/out" ?result 'ac)
+        awvPlotWaveform(newWindow() list(out) ?graphType "polar")
+    )
+    historyName=axlGetHistoryName(abXLRunAfterSimGetHistory())
+    ; example of getting the resDB in this script
+    resDB=axlReadHistoryResDB(historyName)
+    foreach(point resDB->points()
+        foreach(corner point->corners()
+            printf("CORNER: %L\n" corner->name)
+            foreach(test corner->tests()
+                printf("TEST: %L\n" test->name)
+                foreach(output test->outputs()
+                    printf("  %s: %L\n" output->name||"" output->value)
+                )
+            )
+        )
+    )
+
+***************************************************
+
+SCCS Info: @(#) abXLRunAfterSim.ils 01/10/24.00:47:26 1.4
+
+*/
+
+(importSkillVar abXLRunAfterSimMenu)
+(defdynamic abXLRunAfterSimInCB nil)
+
+(let (currentResultsDir currentHist)
+  /****************************************************************
+  *                                                               *
+  *      (abXLRunAfterSimInit [?addMenu t] [?addTriggers t])      *
+  *                                                               *
+  *   Initialize the functions for auto-running of OCEAN scripts  *
+  *                                                               *
+  ****************************************************************/
+  (defglobalfun abXLRunAfterSimInit (@key (addMenu t) (addTriggers t)
+                  (viewTypes list("adexl" "maestro" "explorer")))
+    ;--------------------------------------------------------------------
+    ; Define trigger to automatically run an OCEAN script after simulation
+    ;--------------------------------------------------------------------
+    (when addTriggers
+      (axlSessionRegisterCreationCallback setupTriggers)
+      )
+    ;--------------------------------------------------------------------
+    ; Define pulldown menu to manually run the scripts
+    ;--------------------------------------------------------------------
+    (when addMenu
+      (foreach viewType viewTypes
+               (deRegUserTriggers viewType nil 'abXLRunAfterSimMenuTrigger)
+               )
+      t
+      )
+    ) ; defun abXLRunAfterSimInit
+
+  /*******************************************************************
+  *                                                                  *
+  *                   (runFinished sess runId hist)                  *
+  *                                                                  *
+  * Trigger which is called when the simulations have finished. This *
+  *            runs any OCEAN scripts stored as documents            *
+  *                                                                  *
+  *******************************************************************/
+  (defun runFinished (sess _runId hist)
+    (runAfterSim sess hist)
+    ) ; defun runFinished
+
+  /*******************************************************************
+  *                                                                  *
+  *                      (viewHistory sess hist)                     *
+  *                                                                  *
+  * Trigger which is called when you do a restore history. This also *
+  *   runs any OCEAN scripts stored as documents                     *
+  *                                                                  *
+  *******************************************************************/
+  (defun viewHistory (sess hist _histDir)
+    (runAfterSim sess hist)
+    ) ; defun viewHistory
+
+  /********************************************************************
+  *                                                                   *
+  *                       (setupTriggers sess)                        *
+  *                                                                   *
+  *    Callback which is invoked at ADE XL creation time, and sets    *
+  * up the triggers to be run automatically at the end of simulation. *
+  *                                                                   *
+  ********************************************************************/
+  (defun setupTriggers (sess)
+    (axlSessionConnect sess "runFinishedPrePlot" runFinished)
+    ; This trigger is not for view results, but for setting a history
+    (axlSessionConnect sess "postViewHistoryResults" viewHistory)
+    ) ; defun setupTriggers
+
+  /*****************************************************************
+  *                                                                *
+  *                     (runAfterSim sess hist)                    *
+  *                                                                *
+  *    For a given ADE XL session, and history id, find all the    *
+  * graph documents, update them to reference the current results, *
+  *         and then open waveform windows and plot them.          *
+  *                                                                *
+  *****************************************************************/
+  (defun runAfterSim (sess hist)
+    (unless (dynamic abXLRunAfterSimInCB)
+      (dynamicLet ((abXLRunAfterSimInCB t))
+        (let (oceanFiles resultsDir)
+          (setq resultsDir (axlGetHistoryResultsDir hist))
+          (setq currentResultsDir resultsDir)
+          (setq currentHist hist)
+          (setq oceanFiles (getOCEANFiles sess))
+          (foreach oceanFile oceanFiles
+                   (printf "Invoking %L\n" oceanFile)
+                   (loadi oceanFile)
+                   ) 
+          t
+          ) 
+        )
+      )
+    )
+
+  /*******************************************************************
+  *                                                                  *
+  *            (abXLRunAfterSimGetResultsDir [testName])             *
+  *                                                                  *
+  *   Get the directory containing the current simulation results.   *
+  * For use in the attached OCEAN document. The testName is optional *
+  *                                                                  *
+  *******************************************************************/
+  (defglobalfun abXLRunAfterSimGetResultsDir (@optional testName)
+    (cond
+      ((null currentResultsDir) nil)
+      (testName (strcat currentResultsDir "/psf/" testName))
+      (t currentResultsDir)
+      )
+    )
+
+  /********************************************************************
+  *                                                                   *
+  *               (abXLRunAfterSimOpenResults testName)               *
+  *                                                                   *
+  *    Can be used in place of openResults() to access the results    *
+  * for a named test. This gets the root results for the complete run *
+  *      (so will see families of data for sweeps, corners, etc)      *
+  *                                                                   *
+  ********************************************************************/
+  (defglobalfun abXLRunAfterSimOpenResults (testName)
+    (openResults (abXLRunAfterSimGetResultsDir testName))
+    )
+
+  /***************************************************************
+  *                                                              *
+  *                 (abXLRunAfterSimGetHistory)                  *
+  *                                                              *
+  *  Return the history item corresponding to the results being  *
+  *                           accessed                           *
+  *                                                              *
+  ***************************************************************/
+  (defglobalfun abXLRunAfterSimGetHistory ()
+    currentHist
+    )
+
+  /****************************************************************
+  *                                                               *
+  *            (abXLRunAfterSimIsTestEnabled testName)            *
+  *                                                               *
+  * Return a boolean telling you whether the test was enabled for *
+  *                      the current results                      *
+  *                                                               *
+  ****************************************************************/
+  (defglobalfun abXLRunAfterSimIsTestEnabled (testName)
+    (let (test)
+      (setq test (axlGetTest (axlGetHistoryCheckpoint currentHist) testName))
+      (and test (null (zerop test)) (axlGetEnabled test))
+      )
+    )
+
+  /***************************************************************
+  *                                                              *
+  *                     (getOCEANFiles sess)                     *
+  *                                                              *
+  *               Get the OCEAN documents attached               *
+  *                                                              *
+  ***************************************************************/
+  (defun getOCEANFiles (sess)
+    (let (sdb documentsDir oceanFiles)
+      (setq sdb (axlGetMainSetupDB sess))
+      (setq documentsDir (strcat (axlGetSetupDBDir sdb) "/documents"))
+      ;------------------------------------------------------------------
+      ; Get a sorted list of files which end in .ocn
+      ;------------------------------------------------------------------
+      (setq oceanFiles 
+            (sort 
+              (rexMatchList "\\.ocn$" (getDirFiles documentsDir))
+              'alphalessp
+              ) ; sort
+            ) ; setq
+      ;------------------------------------------------------------------
+      ; Map the files to prepend the document directory path
+      ;------------------------------------------------------------------
+      (foreach mapcar oceanFile oceanFiles
+               (strcat documentsDir "/" oceanFile)
+               ) ; foreach
+      ) ; let
+    ) ; defun getOCEANFIles
+
+
+  /***************************************************************
+  *                                                              *
+  *                          (createMenu)                        *
+  *                                                              *
+  *             Create the Run OCEAN pulldown menu               *
+  *                                                              *
+  ***************************************************************/
+  (defun createMenu ()
+    (let (runOCEAN)
+      (setq runOCEAN
+            (hiCreateMenuItem
+              ?name 'runOCEAN
+              ?itemText "&Run OCEAN Documents"
+              ?callback "(abXLRunAfterSimCB)"
+              )
+            )
+      (hiCreatePulldownMenu
+        'abXLRunAfterSimMenu
+        "Run &OCEAN Documents"
+        (list runOCEAN)
+        ) ; hiCreatePulldownMenu
+      ) ; let
+    ) ; defun
+
+  /***************************************************************
+  *                                                              *
+  *              (abXLRunAfterSimMenuTrigger l_args)             *
+  *                                                              *
+  * Menu trigger to add the pulldown menu for adexl application; *
+  *     called from deRegUserTriggers in abXLRunAfterSimInit     *
+  *                                                              *
+  ***************************************************************/
+  (defglobalfun abXLRunAfterSimMenuTrigger (_l_args)
+    (unless (boundp 'abXLRunAfterSimMenu)
+      (createMenu)
+      )
+    (list abXLRunAfterSimMenu)
+    )
+
+  /***************************************************************
+  *                                                              *
+  *                      (abXLRunAfterSimCB)                     *
+  *                                                              *
+  *   Menu callback to run OCEAN scripts for the current history *
+  *                            point.                            *
+  *                                                              *
+  ***************************************************************/
+  (defglobalfun abXLRunAfterSimCB ()
+    (let (sess hist)
+      (setq sess (axlGetWindowSession))
+      (unless sess (error "Could not find current ADE XL session"))
+      (setq hist (axlGetCurrentHistory sess))
+      (when (zerop hist) (error "Cannot run OCEAN scripts - No current history"))
+      (runAfterSim sess hist)
+      )
+    )
+  )

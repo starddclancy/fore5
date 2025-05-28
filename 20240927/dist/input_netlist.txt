@@ -1,0 +1,7 @@
+aaa
+.SUBCKT cad_dr_a_rdl_half_tmdlvdrv 
+XI_3856598E597 cad_dr_a_ary_tm $T=0 1.2 0 0 $X=0 $Y=1.2 $PINS X_2=X_2 X_3=X_3 X_4=X_6 X_5=X_8 X_6=X_3
++soisub!=soisub!
+XI_3856598E598 cad_dr_a_ary_tm_vwl $T=0 1.2 0 0 $X=0 $Y=1.2 $PINS X_2=X_2 X_3=X_3 X_4=X_6 X_5=X_8 X_6=X_3
++soisub!=soisub!
+.ENDS
